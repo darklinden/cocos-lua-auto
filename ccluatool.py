@@ -145,6 +145,8 @@ def deal_with_lua(path):
     animTypePosition = "position"
     animTypeRotation = "rotation"
     animTypeColor = "color"
+    animTypeAnchorPoint = "anchorPoint"
+    
     animType = animTypeNone
 
     framesPerSecond = 0.0
@@ -231,6 +233,11 @@ def deal_with_lua(path):
                 animType = animTypeColor
                 lastAnimFrameIndex = 0
                 nodeActions = []
+            elif line == 'localFrame = ccs.AnchorPointFrame:create()':
+                # result += '-- anchorPoint\n'
+                animType = animTypeAnchorPoint
+                lastAnimFrameIndex = 0
+                nodeActions = []
             # frame start
             elif line.startswith('localFrame:setFrameIndex'):
                 # print(line)
@@ -256,14 +263,16 @@ def deal_with_lua(path):
                 node = line[line.find('Timeline:setNode(') + len('Timeline:setNode('):]
                 node = node[:-1]
 
-                if animType != animTypeColor:
+                if animType != animTypeColor and animType != animTypeAnchorPoint:
                     actions = allActions.get(node, {})
                     actions[animType] = nodeActions
                     allActions[node] = actions
+                    
             # alpha action
             elif line.startswith('localFrame:setAlpha('):
                 alpha = line[len('localFrame:setAlpha('):]
                 alpha = alpha[:-1]
+                
                 actionObj["animAlpha"] = int(alpha)
             # scale X
             elif line.startswith('localFrame:setScaleX('):
@@ -401,8 +410,7 @@ def deal_with_lua(path):
                                   node + ":setRotationSkewY(" + str(animObj["animRotationY"]) + ")\n end)\n"
                     else:
                         result += "local anim" + num + " = cc.RotateTo:create(" + \
-                                  str(animObj["animFrameLen"]) + ", " + str(animObj["animRotationX"]) + ", " + str(
-                            animObj["animRotationY"]) + ")\n"
+                                str(animObj["animFrameLen"]) + ", " + str(animObj["animRotationX"]) + ", " + str(animObj["animRotationY"]) + ")\n"
                     act_in_sequence.append("anim" + num)
                 if len(act_in_sequence) > 1:
                     num = act_uniqueue_number()
