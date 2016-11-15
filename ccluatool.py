@@ -71,19 +71,6 @@ EXCLUDE_LINE = [
     "result['animation'] = ccs.ActionTimeline:create()"
 ]
 
-# class NodeActionType:
-#     Unknown = 0
-#     Scale = 1
-#     Fade = 2
-#     SpriteFrame = 3
-#
-# class CNodeAction:
-#
-#     act_type = NodeActionType.Unknown
-#     node = ''
-#
-# class CNodeActionScale:
-
 STATIC_NUM = 0
 def act_uniqueue_number():
     global STATIC_NUM
@@ -146,6 +133,8 @@ def deal_with_lua(path):
     animTypeRotation = "rotation"
     animTypeColor = "color"
     animTypeAnchorPoint = "anchorPoint"
+    animTypeBlendFunc = "blendFunc"
+    animTypeVisibleForFrame = "visibleForFrame"
     
     animType = animTypeNone
 
@@ -238,6 +227,17 @@ def deal_with_lua(path):
                 animType = animTypeAnchorPoint
                 lastAnimFrameIndex = 0
                 nodeActions = []
+            elif line == 'local BlendFuncTimeline = ccs.Timeline:create()':
+                # result += '-- BlendFuncTimeline\n'
+                animType = animTypeBlendFunc
+                lastAnimFrameIndex = 0
+                nodeActions = []
+            elif line == 'local VisibleForFrameTimeline = ccs.Timeline:create()':
+                # result += '-- VisibleForFrame\n'
+                animType = animTypeVisibleForFrame
+                lastAnimFrameIndex = 0
+                nodeActions = []
+                
             # frame start
             elif line.startswith('localFrame:setFrameIndex'):
                 # print(line)
@@ -263,7 +263,7 @@ def deal_with_lua(path):
                 node = line[line.find('Timeline:setNode(') + len('Timeline:setNode('):]
                 node = node[:-1]
 
-                if animType != animTypeColor and animType != animTypeAnchorPoint:
+                if animType != animTypeColor and animType != animTypeAnchorPoint and animType != animTypeBlendFunc and animType != animTypeVisibleForFrame:
                     actions = allActions.get(node, {})
                     actions[animType] = nodeActions
                     allActions[node] = actions
@@ -319,8 +319,8 @@ def deal_with_lua(path):
         else:
             pass
 
-    print ("all actions:")
-    print(json.dumps(allActions))
+    # print ("all actions:")
+    # print(json.dumps(allActions))
 
     for node in allActions:
         result += "-- " + node + " animations\n"
@@ -370,7 +370,7 @@ def deal_with_lua(path):
                 result += 'local ' + frames_table + ' = {}\n'
                 for animObj in animActs:
                     frame_name = 'frame' + act_uniqueue_number()
-                    result += 'local ' + frame_name + ' = cc.SpriteFrameCache:getInstance():getSpriteFrame(' + animObj["animTextureName"] + ')\n'
+                    result += 'local ' + frame_name + ' = cc.SpriteFrameCache:getInstance():getSpriteFrame("' + animObj["animTextureName"] + '")\n'
                     result += 'if ' + frame_name + ' ~= nil then\ntable.insert(' + frames_table + ', ' + frame_name + ')\nend\n'
 
                 animation_name = 'animation' + act_uniqueue_number()
@@ -429,6 +429,14 @@ def deal_with_lua(path):
             result += node + ":runAction(" + act_in_sequence[0] + ")\n\n"
 
     f.close()
+    
+    totalLen = float("{0:.2f}".format(frameCount / framesPerSecond)) + 0.5
+    
+    num1 = act_uniqueue_number()
+    result += "local delay" + num1 + " = cc.DelayTime:create(" + str(totalLen) + ")\n"
+    num2 = act_uniqueue_number()
+    result += "local end" + num2 + " = cc.CallFunc:create(function()\n    print('animation ended')\nend)\n"
+    result += "Node:runAction(cc.Sequence:create(delay" + num1 + ", end" + num2 + "))"
 
     result = result.strip()
 
