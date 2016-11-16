@@ -366,19 +366,35 @@ def deal_with_lua(path):
                     act_in_spawn.append(act_in_sequence[0])
 
             elif animKey == animTypeSprite:
-                frames_table = 'animFrames' + act_uniqueue_number()
-                result += 'local ' + frames_table + ' = {}\n'
+                # frames_table = 'animFrames' + act_uniqueue_number()
+                # result += 'local ' + frames_table + ' = {}\n'
+                # for animObj in animActs:
+                #     frame_name = 'frame' + act_uniqueue_number()
+                #     result += 'local ' + frame_name + ' = cc.SpriteFrameCache:getInstance():getSpriteFrame("' + animObj["animTextureName"] + '")\n'
+                #     result += 'if ' + frame_name + ' ~= nil then\ntable.insert(' + frames_table + ', ' + frame_name + ')\nend\n'
+                # 
+                # animation_name = 'animation' + act_uniqueue_number()
+                # result += 'local ' + animation_name + ' = cc.Animation:createWithSpriteFrames(' + frames_table + ', ' + str(animActs[0]["animFrameLen"]) + ')\n'
+                # animate_name = 'animate' + act_uniqueue_number()
+                # result += 'local ' + animate_name + ' = cc.Animate:create(' + animation_name + ')\n'
+                # act_in_spawn.append(animate_name)
+                
+                act_in_sequence = []
                 for animObj in animActs:
-                    frame_name = 'frame' + act_uniqueue_number()
-                    result += 'local ' + frame_name + ' = cc.SpriteFrameCache:getInstance():getSpriteFrame("' + animObj["animTextureName"] + '")\n'
-                    result += 'if ' + frame_name + ' ~= nil then\ntable.insert(' + frames_table + ', ' + frame_name + ')\nend\n'
+                    num = act_uniqueue_number()
+                    result += 'local delay' + num + ' = cc.DelayTime:create(' + str(animObj["animFrameLen"]) + ')\n'
+                    act_in_sequence.append("delay" + num)
+                    result += 'local anim' + num + ' = cc.CallFunc:create(function ()\n    ' + node + ':setSpriteFrame("' + str(animObj["animTextureName"]) + '")\nend)\n'
+                    act_in_sequence.append("anim" + num)
 
-                animation_name = 'animation' + act_uniqueue_number()
-                result += 'local ' + animation_name + ' = cc.Animation:createWithSpriteFrames(' + frames_table + ', ' + str(animActs[0]["animFrameLen"]) + ')\n'
-                animate_name = 'animate' + act_uniqueue_number()
-                result += 'local ' + animate_name + ' = cc.Animate:create(' + animation_name + ')\n'
-                act_in_spawn.append(animate_name)
-
+                if len(act_in_sequence) > 1:
+                    num = act_uniqueue_number()
+                    act_str = ', '.join(act_in_sequence)
+                    result += "local anim" + num + " = cc.Sequence:create(" + act_str + ")\n"
+                    act_in_spawn.append("anim" + num)
+                else:
+                    act_in_spawn.append(act_in_sequence[0])
+                
             elif animKey == animTypePosition:
                 act_in_sequence = []
                 for animObj in animActs:
