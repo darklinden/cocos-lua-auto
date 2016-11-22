@@ -77,6 +77,10 @@ def act_uniqueue_number():
     STATIC_NUM = STATIC_NUM + 1
     return str(STATIC_NUM)
 
+def reset_act_uniqueue_number():
+    global STATIC_NUM
+    STATIC_NUM = 0
+
 def isNodeStart(line):
     checkLine = line.strip(" \t\n\r")
     if checkLine == "--Create Node":
@@ -324,6 +328,8 @@ def deal_with_lua(path):
 
     for node in allActions:
         result += "-- " + node + " animations\n"
+        result += "print(\"" + node + " animation\")\n"
+        result += "if true then\n"
         actions = allActions[node]
         act_in_spawn = []
         # single node actions
@@ -382,8 +388,10 @@ def deal_with_lua(path):
                 act_in_sequence = []
                 for animObj in animActs:
                     num = act_uniqueue_number()
-                    result += 'local delay' + num + ' = cc.DelayTime:create(' + str(animObj["animFrameLen"]) + ')\n'
-                    act_in_sequence.append("delay" + num)
+                    result += 'local anim' + num + ' = cc.DelayTime:create(' + str(animObj["animFrameLen"]) + ')\n'
+                    act_in_sequence.append("anim" + num)
+                    
+                    num = act_uniqueue_number()
                     result += 'local anim' + num + ' = cc.CallFunc:create(function ()\n    ' + node + ':setSpriteFrame("' + str(animObj["animTextureName"]) + '")\nend)\n'
                     act_in_sequence.append("anim" + num)
 
@@ -440,18 +448,21 @@ def deal_with_lua(path):
             num = act_uniqueue_number()
             act_str = ', '.join(act_in_spawn)
             result += "local anim" + num + " = cc.Spawn:create(" + act_str + ")\n"
-            result += node + ":runAction(anim" + num + ")\n\n"
+            result += node + ":runAction(anim" + num + ")\n"
         else:
-            result += node + ":runAction(" + act_in_sequence[0] + ")\n\n"
+            result += node + ":runAction(" + act_in_sequence[0] + ")\n"
+            
+        result += "end\n\n"
+        reset_act_uniqueue_number()
 
     f.close()
     
-    totalLen = float("{0:.2f}".format(frameCount / framesPerSecond)) + 0.5
+    totalLen = float("{0:.2f}".format(frameCount / framesPerSecond))
     
     num1 = act_uniqueue_number()
-    result += "local delay" + num1 + " = cc.DelayTime:create(" + str(totalLen) + ")\n"
+    result += "local anim" + num1 + " = cc.DelayTime:create(" + str(totalLen) + ")\n"
     num2 = act_uniqueue_number()
-    result += "local end" + num2 + " = cc.CallFunc:create(function()\n    print('animation ended')\nend)\n"
+    result += "local anim" + num2 + " = cc.CallFunc:create(function()\n    print('animation ended')\nend)\n"
     result += "Node:runAction(cc.Sequence:create(delay" + num1 + ", end" + num2 + "))"
 
     result = result.strip()
