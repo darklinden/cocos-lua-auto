@@ -47,6 +47,15 @@ EXCLUDE_START = [
     'localFrame:setTween'
 ]
 
+EXCLUDE_END = [
+    ":setLayoutComponentEnabled(true)",
+    ":setLayoutComponentEnabled(false)",
+    ":setCascadeColorEnabled(true)",
+    ":setCascadeColorEnabled(false)",
+    ":setCascadeOpacityEnabled(true)",
+    ":setCascadeOpacityEnabled(false)"
+]
+
 EXCLUDE_LINE = [
     'local luaExtend = require "LuaExtend"',
     'local layout = nil',
@@ -101,7 +110,12 @@ def isExclude(line):
         if tmp.startswith(value):
             ret = True
             break
-
+    
+    for value in EXCLUDE_END:
+        if tmp.endswith(value):
+            ret = True
+            break
+    
     for value in EXCLUDE_LINE:
         if tmp == str(value).strip():
             ret = True
@@ -328,8 +342,11 @@ def deal_with_lua(path):
 
     for node in allActions:
         result += "-- " + node + " animations\n"
-        result += "print(\"" + node + " animation\")\n"
-        result += "if true then\n"
+        result += "local " + node + " = Node:getChildByName(\"" + node + "\")\n"
+        result += "if " + node + " == nil then\n"
+        result += "print(\"add auto generated animation failed: " + node + " is nil\")\n"
+        result += "else\n"
+        result += "print(\"" + node + " animations\")\n"
         actions = allActions[node]
         act_in_spawn = []
         # single node actions
@@ -337,13 +354,19 @@ def deal_with_lua(path):
             animActs = actions[animKey]
             if animKey == animTypeFade:
                 act_in_sequence = []
+                last_alpha = ""
                 for animObj in animActs:
                     num = act_uniqueue_number()
                     if animObj["animFrameLen"] == 0:
                         result += "local anim" + num + " = cc.CallFunc:create(function() " + node + ":setOpacity(" + str(animObj["animAlpha"]) + ") end)\n"
                     else:
-                        result += "local anim" + num + " = cc.FadeTo:create(" + str(animObj["animFrameLen"]) + ", " + str(animObj["animAlpha"]) + ")\n"
+                        if last_alpha == str(animObj["animAlpha"]):
+                            result += "local anim" + num + " = cc.DelayTime:create(" + str(animObj["animFrameLen"]) + ")\n"
+                        else:
+                            result += "local anim" + num + " = cc.FadeTo:create(" + str(animObj["animFrameLen"]) + ", " + str(animObj["animAlpha"]) + ")\n"
+                    last_alpha = str(animObj["animAlpha"])
                     act_in_sequence.append("anim" + num)
+                    
                 if len(act_in_sequence) > 1:
                     num = act_uniqueue_number()
                     act_str = ', '.join(act_in_sequence)
@@ -354,15 +377,23 @@ def deal_with_lua(path):
 
             elif animKey == animTypeScale:
                 act_in_sequence = []
+                last_scaleX = ""
+                last_scaleY = ""
                 for animObj in animActs:
                     num = act_uniqueue_number()
                     if animObj["animFrameLen"] == 0:
                         result += "local anim" + num + " = cc.CallFunc:create(function() " + \
                                   node + ":setScale(" + str(animObj["animScaleX"]) + ", " + str(animObj["animScaleY"]) + ") end)\n"
                     else:
-                        result += "local anim" + num + " = cc.ScaleTo:create(" + \
+                        if last_scaleX == str(animObj["animScaleX"]) and last_scaleY == str(animObj["animScaleY"]):
+                            result += "local anim" + num + " = cc.DelayTime:create(" + str(animObj["animFrameLen"]) + ")\n"
+                        else:
+                            result += "local anim" + num + " = cc.ScaleTo:create(" + \
                                   str(animObj["animFrameLen"]) + ", " + str(animObj["animScaleX"]) + ", " + str(animObj["animScaleY"]) + ")\n"
+                    last_scaleX = str(animObj["animScaleX"])
+                    last_scaleY = str(animObj["animScaleY"])
                     act_in_sequence.append("anim" + num)
+                    
                 if len(act_in_sequence) > 1:
                     num = act_uniqueue_number()
                     act_str = ', '.join(act_in_sequence)
@@ -372,27 +403,19 @@ def deal_with_lua(path):
                     act_in_spawn.append(act_in_sequence[0])
 
             elif animKey == animTypeSprite:
-                # frames_table = 'animFrames' + act_uniqueue_number()
-                # result += 'local ' + frames_table + ' = {}\n'
-                # for animObj in animActs:
-                #     frame_name = 'frame' + act_uniqueue_number()
-                #     result += 'local ' + frame_name + ' = cc.SpriteFrameCache:getInstance():getSpriteFrame("' + animObj["animTextureName"] + '")\n'
-                #     result += 'if ' + frame_name + ' ~= nil then\ntable.insert(' + frames_table + ', ' + frame_name + ')\nend\n'
-                # 
-                # animation_name = 'animation' + act_uniqueue_number()
-                # result += 'local ' + animation_name + ' = cc.Animation:createWithSpriteFrames(' + frames_table + ', ' + str(animActs[0]["animFrameLen"]) + ')\n'
-                # animate_name = 'animate' + act_uniqueue_number()
-                # result += 'local ' + animate_name + ' = cc.Animate:create(' + animation_name + ')\n'
-                # act_in_spawn.append(animate_name)
-                
                 act_in_sequence = []
+                last_frame = ""
                 for animObj in animActs:
                     num = act_uniqueue_number()
                     result += 'local anim' + num + ' = cc.DelayTime:create(' + str(animObj["animFrameLen"]) + ')\n'
                     act_in_sequence.append("anim" + num)
                     
-                    num = act_uniqueue_number()
-                    result += 'local anim' + num + ' = cc.CallFunc:create(function ()\n    ' + node + ':setSpriteFrame("' + str(animObj["animTextureName"]) + '")\nend)\n'
+                    if last_frame == str(animObj["animTextureName"]):
+                        pass
+                    else:
+                        num = act_uniqueue_number()
+                        result += 'local anim' + num + ' = cc.CallFunc:create(function ()\n    ' + node + ':setSpriteFrame("' + str(animObj["animTextureName"]) + '")\nend)\n'
+                    last_frame = str(animObj["animTextureName"])
                     act_in_sequence.append("anim" + num)
 
                 if len(act_in_sequence) > 1:
@@ -405,6 +428,8 @@ def deal_with_lua(path):
                 
             elif animKey == animTypePosition:
                 act_in_sequence = []
+                last_posX = ""
+                last_posY = ""
                 for animObj in animActs:
                     num = act_uniqueue_number()
                     if animObj["animFrameLen"] == 0:
@@ -412,10 +437,16 @@ def deal_with_lua(path):
                                   node + ":setPosition(" + str(animObj["animPosX"]) + ", " + \
                                   str(animObj["animPosY"]) + ") end)\n"
                     else:
-                        result += "local anim" + num + " = cc.MoveTo:create(" + \
-                                  str(animObj["animFrameLen"]) + ", cc.p(" + str(animObj["animPosX"]) + ", " + str(
-                            animObj["animPosY"]) + "))\n"
+                        if last_posX == str(animObj["animPosX"]) and last_posY == str(animObj["animPosY"]):
+                            result += "local anim" + num + " = cc.DelayTime:create(" + str(animObj["animFrameLen"]) + ")\n"
+                        else:
+                            result += "local anim" + num + " = cc.MoveTo:create(" + \
+                                  str(animObj["animFrameLen"]) + ", cc.p(" + str(animObj["animPosX"]) + ", " + str(animObj["animPosY"]) + "))\n"
+                                  
+                    last_posX = str(animObj["animPosX"])
+                    last_posY = str(animObj["animPosY"])
                     act_in_sequence.append("anim" + num)
+                    
                 if len(act_in_sequence) > 1:
                     num = act_uniqueue_number()
                     act_str = ', '.join(act_in_sequence)
@@ -426,6 +457,8 @@ def deal_with_lua(path):
 
             elif animKey == animTypeRotation:
                 act_in_sequence = []
+                last_RotateX = ""
+                last_RotateY = ""
                 for animObj in animActs:
                     num = act_uniqueue_number()
                     if animObj["animFrameLen"] == 0:
@@ -433,9 +466,16 @@ def deal_with_lua(path):
                                   node + ":setRotationSkewX(" + str(animObj["animRotationX"]) + ")\n" + \
                                   node + ":setRotationSkewY(" + str(animObj["animRotationY"]) + ")\n end)\n"
                     else:
-                        result += "local anim" + num + " = cc.RotateTo:create(" + \
+                        if last_RotateX == str(animObj["animRotationX"]) and last_RotateY == str(animObj["animRotationY"]):
+                            result += "local anim" + num + " = cc.DelayTime:create(" + str(animObj["animFrameLen"]) + ")\n"
+                        else:
+                            result += "local anim" + num + " = cc.RotateTo:create(" + \
                                 str(animObj["animFrameLen"]) + ", " + str(animObj["animRotationX"]) + ", " + str(animObj["animRotationY"]) + ")\n"
+                    
+                    last_RotateX = str(animObj["animRotationX"])
+                    last_RotateY = str(animObj["animRotationY"])
                     act_in_sequence.append("anim" + num)
+                    
                 if len(act_in_sequence) > 1:
                     num = act_uniqueue_number()
                     act_str = ', '.join(act_in_sequence)
@@ -463,7 +503,7 @@ def deal_with_lua(path):
     result += "local anim" + num1 + " = cc.DelayTime:create(" + str(totalLen) + ")\n"
     num2 = act_uniqueue_number()
     result += "local anim" + num2 + " = cc.CallFunc:create(function()\n    print('animation ended')\nend)\n"
-    result += "Node:runAction(cc.Sequence:create(delay" + num1 + ", end" + num2 + "))"
+    result += "Node:runAction(cc.Sequence:create(anim" + num1 + ", anim" + num2 + "))"
 
     result = result.strip()
 
